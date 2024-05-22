@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initia Validator Setup</title>
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        header {
+            background-color: #1f1f1f;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #e91e63;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            color: #e91e63;
+        }
+        main {
+            padding: 20px;
+        }
+        h2, h3, h4 {
+            color: #e91e63;
+            margin-top: 20px;
+        }
+        h2 {
+            font-size: 2em;
+            border-bottom: 1px solid #e91e63;
+            padding-bottom: 5px;
+        }
+        h3 {
+            font-size: 1.5em;
+        }
+        h4 {
+            font-size: 1.2em;
+        }
+        p {
+            margin: 10px 0;
+        }
+        a {
+            color: #e91e63;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        pre {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 1em;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #333;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .command {
+            display: block;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        ul {
+            margin: 10px 0 10px 20px;
+            list-style-type: disc;
+        }
+        li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Initia Validator Setup</h1>
+    </header>
+    <main>
+        <h2>Setup Validator Name</h2>
+        <p>Replace <strong>"oneKiller"</strong> with your validator name:</p>
+        <pre><code class="command">MONIKER="oneKiller"</code></pre>
+
+        <h2>Install Dependencies</h2>
+        <h3>Update System and Install Build Tools</h3>
+        <pre><code class="command">sudo apt -q update
+sudo apt -qy install curl git jq lz4 build-essential
+sudo apt -qy upgrade</code></pre>
+
+        <!-- Your text continues... -->
+        <!-- Previous HTML content here -->
+
+        <h3>Install Go</h3>
+        <pre><code class="command">sudo rm -rf /usr/local/go
+curl -Ls https://go.dev/dl/go1.21.10.linux-amd64.tar.gz | sudo tar -xzf - -C /usr/local
+eval $(echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/golang.sh)
+eval $(echo 'export PATH=$PATH:$HOME/go/bin' | tee -a $HOME/.profile)</code></pre>
+
+        <h2>Download and Build Binaries</h2>
+        <h3>Clone Project Repository</h3>
+        <pre><code class="command">cd $HOME
+rm -rf initia
+git clone https://github.com/initia-labs/initia.git
+cd initia
+git checkout v0.2.15</code></pre>
+
+        <!-- Continue with the rest of your text -->
+        <!-- Previous HTML content here -->
+
+        <h3>Build Binaries</h3>
+        <pre><code class="command">make build</code></pre>
+
+        <h3>Prepare Binaries for Cosmovisor</h3>
+        <pre><code class="command">mkdir -p $HOME/.initia/cosmovisor/genesis/bin
+mv build/initiad $HOME/.initia/cosmovisor/genesis/bin/
+rm -rf build</code></pre>
+
+        <h3>Create Application Symlinks</h3>
+        <pre><code class="command">sudo ln -s $HOME/.initia/cosmovisor/genesis $HOME/.initia/cosmovisor/current -f
+sudo ln -s $HOME/.initia/cosmovisor/current/bin/initiad /usr/local/bin/initiad -f</code></pre>
+
+        <h2>Install Cosmovisor and Create a Service</h2>
+        <h3>Download and Install Cosmovisor</h3>
+        <pre><code class="command">go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@v1.5.0</code></pre>
+
+        <h3>Create Service</h3>
+        <pre><code class="command">sudo tee /etc/systemd/system/initia.service > /dev/null << EOF
+[Unit]
+Description=initia node service
+After=network-online.target
+
+[Service]
+User=$USER
+ExecStart=$(which cosmovisor) run start
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+Environment="DAEMON_HOME=$HOME/.initia"
+Environment="DAEMON_NAME=initiad"
+Environment="UNSAFE_SKIP_BACKUP=true"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:$HOME/.initia/cosmovisor/current/bin"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable initia.service</code></pre>
+
+        <!-- Continue with the rest of your text -->
+        <!-- Previous HTML content here -->
+
+        <h2>Initialize the Node</h2>
+        <h3>Set Node Configuration</h3>
+        <pre><code class="command">initiad config set client chain-id initiation-1
+initiad config set client keyring-backend test
+initiad config set client node tcp://localhost:17957</code></pre>
+
+        <h3>Initialize the Node</h3>
+        <pre><code class="command">initiad init $MONIKER --chain-id initiation-1</code></pre>
+
+        <h3>Download Genesis and Addrbook</h3>
+        <pre><code class="command">curl -Ls https://snapshots.kjnodes.com/initia-testnet/genesis.json > $HOME/.initia/config/genesis.json
+curl -Ls https://snapshots.kjnodes.com/initia-testnet/addrbook.json > $HOME/.initia/config/addrbook.json</code></pre>
+
+        <h3>Add Seeds</h3>
+        <pre><code class="command">sed -i -e "s|^seeds *=.*|seeds = \"3f472746f46493309650e5a033076689996c8881@initia-testnet.rpc.kjnodes.com:17959\"|" $HOME/.initia/config/config.toml</code></pre>
+
+        <h3>Set Minimum Gas Price</h3>
+        <pre><code class="command">sed -i -e "s|^minimum-gas-prices *=.*|minimum-gas-prices = \"0.15uinit,0.01uusdc\"|" $HOME/.initia/config/app.toml</code></pre>
+
+        <h3>Set Pruning</h3>
+        <pre><code class="command">sed -i \
+  -e 's|^pruning *=.*|pruning = "custom"|' \
+  -e 's|^pruning-keep-recent *=.*|pruning-keep-recent = "100"|' \
+  -e 's|^pruning-keep-every *=.*|pruning-keep-every = "0"|' \
+  -e 's|^pruning-interval *=.*|pruning-interval = "19"|' \
+  $HOME/.initia/config/app.toml</code></pre>
+
+        <h3>Set Custom Ports</h3>
+        <pre><code class="command">sed -i -e "s%^proxy_app = \"tcp://127.0.0.1:26658\"%proxy_app = \"tcp://127.0.0.1:17958\"%; s%^laddr = \"tcp://127.0.0.1:26657\"%laddr = \"tcp://127.0.0.1:17957\"%; s%^pprof_laddr = \"localhost:6060\"%pprof_laddr = \"localhost:17960\"%; s%^laddr = \"tcp://0.0.0.0:26656\"%laddr = \"tcp://0.0.0.0:17956\"%; s%^prometheus_listen_addr = \":26660\"%prometheus_listen_addr = \":17966\"%" $HOME/.initia/config/config.toml
+sed -i -e "s%^address = \"tcp://localhost:1317\"%address = \"tcp://localhost:17917\"%; s%^address = \":8080\"%address = \":17910\"%; s%^address = \"localhost:9090\"%address = \"localhost:17990\"%; s%^address = \"localhost:9091\"%address = \"localhost:17991\"%" $HOME/.initia/config/app.toml</code></pre>
+
+        <h2>Start Node</h2>
+        <p>Start the node with the following command:</p>
+        <pre><code class="command">sudo systemctl start initia.service</code></pre>
+
+        <h3>Check Logs</h3>
+        <p>Use the command below to check the node logs:</p>
+        <pre><code class="command">sudo journalctl -u initia.service -f --no-hostname -o cat</code></pre>
+
+        <h2>Setup State Sync</h2>
+        <h3>Stop Service</h3>
+        <pre><code class="command">sudo systemctl stop initia.service</code></pre>
+
+        <h3>Reset State</h3>
+        <pre><code class="command">initiad tendermint unsafe-reset-all --home $HOME/.initia --keep-addr-book</code></pre>
+
+        <!-- Continue with the rest of your text -->
+        <!-- Previous HTML content here -->
+
+        <h2>Setup State Sync</h2>
+        <h3>Stop Service</h3>
+        <pre><code class="command">sudo systemctl stop initia.service</code></pre>
+
+        <h3>Reset State</h3>
+        <pre><code class="command">initiad tendermint unsafe-reset-all --home $HOME/.initia --keep-addr-book</code></pre>
+
+        <h3>Get State Sync Information</h3>
+        <pre><code class="command">SNAP_RPC="https://initia-testnet.rpc.kjnodes.com:443"
+LATEST_HEIGHT=$(curl -s $SNAP_RPC/block | jq -r .result.block.header.height)
+BLOCK_HEIGHT=$((LATEST_HEIGHT - 2000))
+TRUST_HASH=$(curl -s "$SNAP_RPC/block?height=$BLOCK_HEIGHT" | jq -r .result.block_id.hash)</code></pre>
+
+        <h3>Configure State Sync</h3>
+        <pre><code class="command">sed -i -e "s|^enable *=.*|enable = true|; s|^rpc_servers *=.*|rpc_servers = \"$SNAP_RPC,$SNAP_RPC\"|; s|^trust_height *=.*|trust_height = $BLOCK_HEIGHT|; s|^trust_hash *=.*|trust_hash = \"$TRUST_HASH\"|; s|^trust_period *=.*|trust_period = \"1000h\"|" $HOME/.initia/config/config.toml</code></pre>
+
+        <h3>Restart Service</h3>
+        <pre><code class="command">sudo systemctl start initia.service
+sudo journalctl -u initia.service -f --no-hostname -o cat</code></pre>
+
+        <h2>Set up Validator</h2>
+        <p>Official documentation: <a href="https://your-validator-docs-url">Validator Documentation</a></p>
+
+        <h3>1. Create a Wallet</h3>
+        <p>You have two options to create a wallet:</p>
+        <ul>
+            <li><strong>Option 1:</strong> Create New Wallet</li>
+            <pre><code class="command">initiad keys add wallet</code></pre>
+            <li><strong>Option 2:</strong> Recover Existing Wallet</li>
+            <pre><code class="command">initiad keys add wallet --recover</code></pre>
+        </ul>
+        <p>Save the mnemonic output as this is the only way to recover your validator wallet in case you lose it!</p>
+        <p>To list your wallets use:</p>
+        <pre><code class="command">initiad keys list</code></pre>
+
+        <h3>2. Fund the Wallet</h3>
+        <p>Fund the previously created wallet using Initia Faucet.</p>
+        <p>To check wallet balance:</p>
+        <pre><code class="command">initiad q bank balances $(initiad keys show wallet -a)</code></pre>
+
+        <h3>3. Create Validator</h3>
+        <p>Ensure you have adjusted moniker, identity, details, and website to match your values.</p>
+        <pre><code class="command">initiad tx mstaking create-validator \
+--amount 1000000uinit \
+--pubkey $(initiad tendermint show-validator) \
+--moniker "YOUR_MONIKER_NAME" \
+--identity "YOUR_KEYBASE_ID" \
+--details "YOUR_DETAILS" \
+--website "YOUR_WEBSITE_URL" \
+--chain-id initiation-1 \
+--commission-rate 0.05 \
+--commission-max-rate 0.20 \
+--commission-max-change-rate 0.05 \
+--from wallet \
+--fees 5000uinit \
+-y</code></pre>
+        <p>Save the ~/.initia/config/priv_validator_key.json file as this is the only way to recover your validator signing key in case you lose it!</p>
+
+        <h2>Set up Oracle</h2>
+        <p>This guide is only for validator nodes.</p>
+        <p>Official documentation: <a href="https://your-oracle-docs-url">Oracle Documentation</a></p>
+
+        <h3>Slinky Oracle Components:</h3>
+        <ul>
+            <li>An on-chain component that retrieves price data from the sidecar with each block, forwards these prices to the blockchain through vote extensions, and compiles prices from all validators involved.</li>
+            <li>A sidecar process dedicated to polling price information from various providers and delivering this data to the on-chain component.</li>
+        </ul>
+
+        <h3>Step 1: Clone the Repository and Build Binaries</h3>
+        <p>Clone Repository</p>
+        <pre><code class="command">cd $HOME
+rm -rf slinky
+git clone https://github.com/skip-mev/slinky.git
+cd slinky
+git checkout v0.4.3</code></pre>
+
+        <p>Build Binaries</p>
+        <pre><code class="command">make build</code></pre>
+
+        <p>Move Binary to Local Bin</p>
+        <pre><code class="command">mv build/slinky /usr/local/bin/
+rm -rf build</code></pre>
+
+        <!-- Continue with the rest of your text -->
+        <!-- Previous HTML content here -->
+
+        <h3>Step 2: Run Oracle</h3>
+        <p>Create Systemd Service</p>
+        <pre><code class="command">sudo tee /etc/systemd/system/slinky.service > /dev/null << EOF
+[Unit]
+Description=Slinky Oracle Service
+After=network-online.target
+
+[Service]
+User=$USER
+ExecStart=/usr/local/bin/slinky
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF</code></pre>
+
+        <p>Enable and Start Systemd Service</p>
+        <pre><code class="command">sudo systemctl daemon-reload
+sudo systemctl enable slinky.service
+sudo systemctl start slinky.service</code></pre>
+
+        <h3>Step 3: Validating Prices</h3>
+        <p>Upon launching the oracle, you should observe successful price retrieval from the provider sources. Additionally, you have the option to execute the test client script available in the Slinky repository by using:</p>
+        <pre><code class="command">make run-oracle-client</code></pre>
+
+        <h3>Step 4: Enable Oracle Vote Extension</h3>
+        <p>To utilize the Slinky oracle data in the Initia node, enable the Oracle setting in the config/app.toml file.</p>
+        <pre><code>[oracle]
+# Enabled indicates whether the oracle is enabled.
+enabled = "true"
+
+# Oracle Address is the URL of the out of process oracle sidecar. This is used to
+# connect to the oracle sidecar when the application boots up. Note that the address
+# can be modified at any point, but will only take effect after the application is
+# restarted. This can be the address of an oracle container running on the same
+# machine or a remote machine.
+oracle_address = "127.0.0.1:8080"
+
+# Client Timeout is the time that the client is willing to wait for responses from 
+# the oracle before timing out.
+client_timeout = "500ms"
+
+# MetricsEnabled determines whether oracle metrics are enabled. Specifically
+# this enables instrumentation of the oracle client and the interaction between
+# the oracle and the app.
+metrics_enabled = "false"
+</code></pre>
+
+        <h3>Step 5: Check Systemd Logs</h3>
+        <p>To check service logs:</p>
+        <pre><code class="command">journalctl -fu slinky --no-hostname</code></pre>
+        <p>Successful Log Examples:</p>
+        <pre><code>May 14 19:07:08 slinky[877177]: {"level":"info","ts":"2024-05-14T19:07:08.296Z","num_prices":65}
+May 14 19:07:08 slinky[877177]: {"level":"info","ts":"2024-05-14T19:07:08.547Z","caller":"oracle/oracle.go:163","msg":"oracle updated prices","pid":877177,"process":"oracle","last_sync":"2024-05-14T19:07:08.547Z","num_prices":65}
+May 14 19:07:08 slinky[877177]: {"level":"info","ts":"2024-05-14T19:07:08.796Z","caller":"oracle/oracle.go:163","msg":"oracle updated prices","pid":877177,"process":"oracle","last_sync":"2024-05-14T19:07:08.796Z","num_prices":65}
+May 14 19:07:09 slinky[877177]: {"level":"info","ts":"2024-05-14T19:07:09.045Z","caller":"oracle/oracle.go:163","msg":"oracle updated prices","pid":877177,"process":"oracle","last_sync":"2024-05-14T19:07:09.045Z","num_prices":65}
+May 14 19:07:09 slinky[877177]: {"level":"info","ts":"2024-05-14T19:07:09.296Z","caller":"oracle/oracle.go:163","msg":"oracle updated prices","pid":877177,"process":"oracle","last_sync":"2024-05-14T19:07:09.296Z","num_prices":65}</code></pre>
+    </main>
+</body>
+</html>
